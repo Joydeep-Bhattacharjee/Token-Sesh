@@ -224,7 +224,7 @@ def cancel_booking(
     db.commit()
 
     cache.invalidate_report(user.org_id)
-    cache.invalidate_availability(room.id, booking.start_time.date().isoformat())
+    cache.invalidate_availability(booking.room_id, booking.start_time.date().isoformat())
     notifications.notify_cancelled(booking)
 
     return {

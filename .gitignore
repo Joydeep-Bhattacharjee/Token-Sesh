@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+cowork.db
+cowork.db-wal
+cowork.db-shm
+.venv/

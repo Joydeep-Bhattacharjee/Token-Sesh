@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..auth import (
+    consume_refresh_jti,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -19,7 +20,7 @@ from ..schemas import LoginRequest, RefreshRequest, RegisterRequest
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=200)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     org = db.query(Organization).filter(Organization.name == payload.org_name).first()
     role = "admin" if org is None else "member"
@@ -35,12 +36,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         .first()
     )
     if existing is not None:
-        return {
-            "user_id": existing.id,
-            "org_id": org.id,
-            "username": existing.username,
-            "role": existing.role,
-        }
+        raise AppError(409, "USERNAME_TAKEN", "Username already taken in this organization")
 
     user = User(
         org_id=org.id,
@@ -83,6 +79,8 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     data = decode_token(payload.refresh_token)
     if data.get("type") != "refresh":
         raise AppError(401, "UNAUTHORIZED", "Wrong token type")
+    if not data.get("jti") or not consume_refresh_jti(data["jti"]):
+        raise AppError(401, "UNAUTHORIZED", "Refresh token already used")
     user = db.query(User).filter(User.id == int(data["sub"])).first()
     if user is None:
         raise AppError(401, "UNAUTHORIZED", "Unknown user")

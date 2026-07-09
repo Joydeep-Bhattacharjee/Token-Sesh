@@ -11,6 +11,7 @@ from ..database import get_db
 from ..errors import AppError
 from ..models import Booking, Room, User
 from ..services.export import generate_export
+from ..timeutils import parse_input_datetime
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -27,13 +28,17 @@ def usage_report(
         return cached
 
     try:
-        from_date = datetime.strptime(frm, "%Y-%m-%d").date()
-        to_date = datetime.strptime(to, "%Y-%m-%d").date()
+        if "T" in frm or "t" in frm:
+            range_start = parse_input_datetime(frm)
+        else:
+            range_start = datetime.combine(datetime.strptime(frm, "%Y-%m-%d").date(), time.min)
+
+        if "T" in to or "t" in to:
+            range_end = parse_input_datetime(to)
+        else:
+            range_end = datetime.combine(datetime.strptime(to, "%Y-%m-%d").date(), time.max)
     except ValueError:
         raise AppError(400, "INVALID_BOOKING_WINDOW", "Invalid date range")
-
-    range_start = datetime.combine(from_date, time.min)
-    range_end = datetime.combine(to_date + timedelta(days=1), time.min)
 
     rooms = db.query(Room).filter(Room.org_id == admin.org_id).order_by(Room.id.asc()).all()
     room_rows = []
@@ -44,7 +49,7 @@ def usage_report(
                 Booking.room_id == room.id,
                 Booking.status == "confirmed",
                 Booking.start_time >= range_start,
-                Booking.start_time < range_end,
+                Booking.start_time <= range_end,
             )
             .all()
         )

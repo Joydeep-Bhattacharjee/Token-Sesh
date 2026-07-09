@@ -23,6 +23,18 @@ from .models import User
 # longer be used.
 _revoked_tokens: set[str] = set()
 
+# Refresh tokens are single-use: once presented to /auth/refresh their jti is
+# recorded here and any reuse is rejected.
+_used_refresh_jtis: set[str] = set()
+
+
+def consume_refresh_jti(jti: str) -> bool:
+    """Mark a refresh jti as used. Returns False if it was already used."""
+    if jti in _used_refresh_jtis:
+        return False
+    _used_refresh_jtis.add(jti)
+    return True
+
 _PBKDF2_ROUNDS = 100_000
 
 
@@ -47,7 +59,7 @@ def _now_ts() -> int:
 
 def create_access_token(user: User) -> str:
     iat = _now_ts()
-    lifetime = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    lifetime = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user.id),
         "org": user.org_id,
@@ -94,7 +106,7 @@ def get_token_payload(request: Request) -> dict:
     payload = decode_token(token)
     if payload.get("type") != "access":
         raise AppError(401, "UNAUTHORIZED", "Wrong token type")
-    if payload.get("sub") in _revoked_tokens:
+    if payload.get("jti") in _revoked_tokens:
         raise AppError(401, "UNAUTHORIZED", "Token has been revoked")
     return payload
 

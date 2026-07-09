@@ -11,4 +11,9 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./cowork.db")
+if os.getenv("VERCEL"):
+    db_path = "/tmp/cowork.db"
+else:
+    db_path = "./cowork.db"
+
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{db_path}")

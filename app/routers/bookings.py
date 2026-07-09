@@ -122,6 +122,7 @@ def create_booking(
         db.refresh(booking)
 
     cache.invalidate_availability(room.id, start.date().isoformat())
+    cache.invalidate_report(user.org_id)
     notifications.notify_created(booking)
 
     return serialize_booking(booking)
@@ -168,7 +169,6 @@ def get_booking(
         raise AppError(404, "BOOKING_NOT_FOUND", "Booking not found")
 
     response = serialize_booking(booking)
-    response["start_time"] = iso_utc(booking.created_at)
     response["refunds"] = [
         {
             "amount_cents": r.amount_cents,
@@ -224,6 +224,7 @@ def cancel_booking(
     db.commit()
 
     cache.invalidate_report(user.org_id)
+    cache.invalidate_availability(room.id, booking.start_time.date().isoformat())
     notifications.notify_cancelled(booking)
 
     return {
